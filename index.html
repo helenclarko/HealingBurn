@@ -160,10 +160,10 @@
 <body>
 <div id="app">
   <div id="sceneWrap">
-    <img id="bgLayer" src="assets/background.png" alt="">
-    <img id="flameLayer" src="assets/flame_1.png" alt="">
+    <img id="bgLayer" alt="">
+    <img id="flameLayer" alt="">
     <canvas id="particleLayer" width="1536" height="1024"></canvas>
-    <img id="handLayer" src="assets/hand_holding.png" alt="">
+    <img id="handLayer" alt="">
     <button id="muteBtn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
   </div>
   <button class="cta" id="ritualBtn">Heal</button>
@@ -199,9 +199,15 @@
   const FIRE_X = 771, FIRE_Y = 790;
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const HAND_HOLD_SRC = 'assets/hand_holding.png';
-  const HAND_DROP_SRC = 'assets/hand_drop.png';
-  const FLAME_FRAMES = ['assets/flame_1.png', 'assets/flame_2.png', 'assets/flame_3.png'];
+  // bump this whenever an asset file's *contents* change so browsers/CDNs
+  // (GitHub Pages included) don't keep serving a stale cached copy
+  const ASSET_VERSION = 2;
+  const v = (src) => `${src}?v=${ASSET_VERSION}`;
+
+  const BACKGROUND_SRC = v('assets/background.png');
+  const HAND_HOLD_SRC = v('assets/hand_holding.png');
+  const HAND_DROP_SRC = v('assets/hand_drop.png');
+  const FLAME_FRAMES = ['assets/flame_1.png', 'assets/flame_2.png', 'assets/flame_3.png'].map(v);
 
   function loadImage(src) {
     return new Promise((resolve, reject) => {
@@ -212,6 +218,7 @@
     });
   }
 
+  const bgLayer = document.getElementById('bgLayer');
   const flameLayer = document.getElementById('flameLayer');
   const handLayer = document.getElementById('handLayer');
   const particleCanvas = document.getElementById('particleLayer');
@@ -219,7 +226,7 @@
   const ritualBtn = document.getElementById('ritualBtn');
 
   const assetList = [
-    ['background', 'assets/background.png'],
+    ['background', BACKGROUND_SRC],
     ['hold', HAND_HOLD_SRC],
     ['drop', HAND_DROP_SRC],
   ];
@@ -473,6 +480,9 @@
 
   Promise.all(assetList.map(([, src]) => loadImage(src)))
     .then(() => {
+      bgLayer.src = BACKGROUND_SRC;
+      flameLayer.src = FLAME_FRAMES[0];
+      handLayer.src = HAND_HOLD_SRC;
       document.getElementById('startBtn').addEventListener('click', () => {
         startAudio();
         document.getElementById('overlay').style.opacity = '0';
