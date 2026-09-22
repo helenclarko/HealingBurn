@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>RosyFire</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --panel-bg: rgba(18, 12, 22, 0.82);
+    --panel-border: rgba(255, 190, 140, 0.18);
+    --warm: #ffb066;
+    --warm-dim: #caa07a;
+    --text: #f1e6da;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #08060c;
+    color: var(--text);
+    font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    overflow: hidden;
+  }
+
+  #app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 16px;
+  }
+
+  #sceneWrap {
+    position: relative;
+    width: min(94vw, 1200px);
+    aspect-ratio: 1536 / 1024;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03);
+  }
+
+  #sceneWrap img,
+  #sceneWrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+  }
+
+  #bgLayer { z-index: 1; }
+
+  #flameLayer {
+    z-index: 2;
+    transform: scale(0.52);
+    transform-origin: 50.2% 77.1%;
+    transition: filter 1s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: filter;
+  }
+
+  #particleLayer { z-index: 3; }
+
+  #handLayer {
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+  #handLayer.visible { opacity: 1; }
+
+  #muteBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 5;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--panel-border);
+    background: rgba(10, 7, 14, 0.55);
+    color: var(--text);
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  #muteBtn:hover { border-color: var(--warm); }
+
+  .cta {
+    padding: 12px 28px;
+    font-size: 15px;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+    color: #1a1210;
+    background: linear-gradient(180deg, #ffcf8f, var(--warm));
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 22px rgba(255, 150, 60, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.3s ease;
+  }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255, 150, 60, 0.45); }
+  .cta:active { transform: translateY(0); }
+  .cta:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+  #overlay, #closing {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 60%, rgba(60,25,20,0.35), rgba(4,3,6,0.92));
+    z-index: 100;
+    text-align: center;
+    padding: 24px;
+    transition: opacity 0.8s ease;
+  }
+
+  .panel {
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .panel h1 {
+    font-size: clamp(28px, 5vw, 40px);
+    margin: 0;
+    letter-spacing: 0.5px;
+    color: var(--warm);
+    text-shadow: 0 0 18px rgba(255, 150, 70, 0.35);
+  }
+
+  .panel p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    opacity: 0.85;
+  }
+
+  .panel .cta { margin-top: 6px; }
+
+  #closing { display: none; opacity: 0; }
+  #closing.visible { display: flex; opacity: 1; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sceneWrap">
+    <img id="bgLayer" src="assets/background.png" alt="">
+    <img id="flameLayer" src="assets/flame_1.png" alt="">
+    <canvas id="particleLayer" width="1536" height="1024"></canvas>
+    <img id="handLayer" src="assets/hand_holding.png" alt="">
+    <button id="muteBtn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
+  </div>
+  <button class="cta" id="ritualBtn">Heal</button>
+</div>
+
+<div id="overlay">
+  <div class="panel">
+    <h1>RosyFire</h1>
+    <p>A quiet place to sit for a while. When you're ready, there's something
+       by your side you no longer need to carry &mdash; you can let the fire
+       take it. Nothing here is permanent, and nothing here is real. It's
+       just a small ritual for letting go.</p>
+    <button class="cta" id="startBtn">Sit by the fire</button>
+  </div>
+</div>
+
+<div id="closing">
+  <div class="panel">
+    <h1>It's okay to let go</h1>
+    <p>What you brought has been given to the fire. Sit with that for as
+       long as you need. You can start again whenever you'd like.</p>
+    <button class="cta" id="restartBtn">Start again</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // scene art is authored at 1536x1024; the fire anchor is where the flame
+  // meets the logs in that image, used for ember spawn positions
+  const SCENE_W = 1536, SCENE_H = 1024;
+  const FIRE_X = 771, FIRE_Y = 790;
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const HAND_HOLD_SRC = 'assets/hand_holding.png';
+  const HAND_DROP_SRC = 'assets/hand_drop.png';
+  const FLAME_FRAMES = ['assets/flame_1.png', 'assets/flame_2.png', 'assets/flame_3.png'];
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  const flameLayer = document.getElementById('flameLayer');
+  const handLayer = document.getElementById('handLayer');
+  const particleCanvas = document.getElementById('particleLayer');
+  const pctx = particleCanvas.getContext('2d');
+  const ritualBtn = document.getElementById('ritualBtn');
+
+  const assetList = [
+    ['background', 'assets/background.png'],
+    ['hold', HAND_HOLD_SRC],
+    ['drop', HAND_DROP_SRC],
+  ];
+  FLAME_FRAMES.forEach((src, i) => assetList.push([`flame${i}`, src]));
+
+  // ---------------------------------------------------------------------
+  // particles (embers) - drawn on a canvas that shares the art's own
+  // 1536x1024 coordinate space, scaled down visually with everything else
+  // ---------------------------------------------------------------------
+
+  const particles = [];
+
+  function spawnEmber(burst) {
+    const spread = burst ? 50 : 20;
+    const speed = burst ? 6 : 2.2;
+    particles.push({
+      x: FIRE_X + (Math.random() - 0.5) * spread,
+      y: FIRE_Y - 30 - Math.random() * 30,
+      vx: (Math.random() - 0.5) * (burst ? 3.5 : 1.2),
+      vy: -(speed * 0.6 + Math.random() * speed),
+      life: 0,
+      maxLife: (burst ? 1.4 : 1.1) + Math.random() * 1.2,
+      size: burst ? (4 + Math.random() * 6) : (2 + Math.random() * 4),
+      hot: burst,
+    });
+  }
+
+  function burstEmbers() {
+    const n = reducedMotion ? 8 : 22;
+    for (let i = 0; i < n; i++) spawnEmber(true);
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life += dt;
+      if (p.life >= p.maxLife) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt * 60;
+      p.y += p.vy * dt * 60;
+      p.vx += (Math.random() - 0.5) * 0.08;
+      p.vy -= 0.02;
+    }
+  }
+
+  function drawParticles() {
+    pctx.clearRect(0, 0, SCENE_W, SCENE_H);
+    for (const p of particles) {
+      const t = p.life / p.maxLife;
+      const alpha = 1 - t;
+      const r = p.size * (1 - t * 0.4);
+      const core = p.hot ? '255,225,180' : '255,180,110';
+      pctx.beginPath();
+      pctx.fillStyle = `rgba(${core},${alpha.toFixed(2)})`;
+      pctx.arc(p.x, p.y, Math.max(r, 1), 0, Math.PI * 2);
+      pctx.fill();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // fire - the real art frames already carry their own flicker and embers;
+  // the only extra feedback we add is a brief brightness flare plus a
+  // livelier particle burst at the moment the hoodie lands
+  // ---------------------------------------------------------------------
+
+  let flameIndex = 0;
+
+  function flare() {
+    flameLayer.style.transition = 'none';
+    flameLayer.style.filter = 'brightness(1.45) saturate(1.15)';
+    requestAnimationFrame(() => {
+      flameLayer.style.transition = 'filter 1.2s cubic-bezier(0.22, 1, 0.36, 1)';
+      flameLayer.style.filter = 'none';
+    });
+  }
+
+  function cycleFlameFrame() {
+    flameIndex = (flameIndex + 1) % FLAME_FRAMES.length;
+    flameLayer.src = FLAME_FRAMES[flameIndex];
+  }
+
+  let running = false;
+
+  function startLoop() {
+    if (running) return;
+    running = true;
+    setInterval(cycleFlameFrame, reducedMotion ? 320 : 220);
+
+    let last = performance.now();
+    let ambientTimer = 0;
+    function tick(now) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      ambientTimer -= dt;
+      if (ambientTimer <= 0) {
+        spawnEmber(false);
+        ambientTimer = (reducedMotion ? 0.5 : 0.2) + Math.random() * 0.2;
+      }
+      updateParticles(dt);
+      drawParticles();
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ---------------------------------------------------------------------
+  // audio (fully synthesized, no external files)
+  // ---------------------------------------------------------------------
+
+  let audioCtx = null;
+  let masterGain = null;
+  let muted = false;
+
+  function makeNoiseBuffer(ctx, seconds) {
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    return buffer;
+  }
+
+  function startAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.55;
+    masterGain.connect(audioCtx.destination);
+
+    const bedSource = audioCtx.createBufferSource();
+    bedSource.buffer = makeNoiseBuffer(audioCtx, 4);
+    bedSource.loop = true;
+    const bedFilter = audioCtx.createBiquadFilter();
+    bedFilter.type = 'lowpass';
+    bedFilter.frequency.value = 700;
+    const bedGain = audioCtx.createGain();
+    bedGain.gain.value = 0.05;
+    bedSource.connect(bedFilter).connect(bedGain).connect(masterGain);
+    bedSource.start();
+
+    const padFreqs = [110, 164.81, 220];
+    const padFilter = audioCtx.createBiquadFilter();
+    padFilter.type = 'lowpass';
+    padFilter.frequency.value = 500;
+    padFilter.connect(masterGain);
+
+    const lfo = audioCtx.createOscillator();
+    lfo.frequency.value = 0.07;
+    const lfoGain = audioCtx.createGain();
+    lfoGain.gain.value = 160;
+    lfo.connect(lfoGain).connect(padFilter.frequency);
+    lfo.start();
+
+    padFreqs.forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f * (1 + (i - 1) * 0.003);
+      const g = audioCtx.createGain();
+      g.gain.value = 0.028;
+      osc.connect(g).connect(padFilter);
+      osc.start();
+    });
+
+    scheduleCrackle();
+  }
+
+  function playCracklePop() {
+    if (!audioCtx) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = makeNoiseBuffer(audioCtx, 0.08);
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 800 + Math.random() * 2200;
+    filter.Q.value = 1.2;
+    const g = audioCtx.createGain();
+    const now = audioCtx.currentTime;
+    const peak = 0.12 + Math.random() * 0.18;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(peak, now + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.05 + Math.random() * 0.08);
+    src.connect(filter).connect(g).connect(masterGain);
+    src.start();
+    src.stop(now + 0.2);
+  }
+
+  function scheduleCrackle() {
+    playCracklePop();
+    setTimeout(scheduleCrackle, 90 + Math.random() * 340);
+  }
+
+  function flareAudio() {
+    if (!audioCtx) return;
+    for (let i = 0; i < 5; i++) {
+      setTimeout(playCracklePop, i * 45 + Math.random() * 40);
+    }
+  }
+
+  function toggleMute() {
+    muted = !muted;
+    document.getElementById('muteBtn').textContent = muted ? '🔇' : '🔊';
+    if (masterGain && audioCtx) {
+      masterGain.gain.linearRampToValueAtTime(muted ? 0 : 0.55, audioCtx.currentTime + 0.25);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // the ritual: hold the hoodie over the fire, then let it go
+  // ---------------------------------------------------------------------
+
+  let ritualState = 'idle'; // idle -> holding -> dropping
+
+  function beginHolding() {
+    handLayer.src = HAND_HOLD_SRC;
+    handLayer.classList.add('visible');
+    ritualBtn.textContent = 'Let go';
+    ritualState = 'holding';
+  }
+
+  function letGo() {
+    ritualState = 'dropping';
+    ritualBtn.disabled = true;
+    handLayer.src = HAND_DROP_SRC;
+
+    setTimeout(() => {
+      handLayer.classList.remove('visible');
+      flare();
+      burstEmbers();
+      flareAudio();
+      setTimeout(showClosing, 1500);
+    }, 550);
+  }
+
+  ritualBtn.addEventListener('click', () => {
+    if (ritualState === 'idle') beginHolding();
+    else if (ritualState === 'holding') letGo();
+  });
+
+  function showClosing() {
+    document.getElementById('closing').classList.add('visible');
+  }
+
+  function resetRitual() {
+    document.getElementById('closing').classList.remove('visible');
+    handLayer.classList.remove('visible');
+    handLayer.src = HAND_HOLD_SRC;
+    ritualBtn.disabled = false;
+    ritualBtn.textContent = 'Heal';
+    ritualState = 'idle';
+  }
+
+  // ---------------------------------------------------------------------
+  // boot
+  // ---------------------------------------------------------------------
+
+  Promise.all(assetList.map(([, src]) => loadImage(src)))
+    .then(() => {
+      document.getElementById('startBtn').addEventListener('click', () => {
+        startAudio();
+        document.getElementById('overlay').style.opacity = '0';
+        setTimeout(() => document.getElementById('overlay').classList.add('hidden'), 800);
+        startLoop();
+      });
+      document.getElementById('muteBtn').addEventListener('click', toggleMute);
+      document.getElementById('restartBtn').addEventListener('click', resetRitual);
+    })
+    .catch(err => {
+      console.error('Failed to load assets', err);
+    });
+})();
+</script>
+</body>
+</html>

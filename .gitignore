@@ -1,0 +1,13 @@
+# Working reference art (already baked into assets/, not needed to run the site)
+/Fire1.png
+/Fire2.png
+/Fire3.png
+/Full Scene.png
+/Hoodie.png
+/Drop.png
+/Scene.png
+/Scene - No Fire.png
+
+__pycache__/
+*.pyc
+*.bak
